@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>نظام إدارة مكتب المحاماة</title>
+<style>
+:root{--blue:#155eef;--navy:#172b4d;--bg:#f4f7fb;--line:#e3e8ef;--red:#c62828}
+*{box-sizing:border-box}body{margin:0;font-family:Tahoma,Arial,sans-serif;background:var(--bg);color:#1d2939}
+button,input,select,textarea{font:inherit}button{cursor:pointer;border:0;border-radius:8px;padding:10px 14px;background:var(--blue);color:#fff}
+button.secondary{background:#e8eef8;color:#183153}button.danger{background:var(--red)}button:disabled{opacity:.5;cursor:not-allowed}
+header{background:var(--navy);color:white;padding:16px 22px;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+header h1{font-size:20px;margin:0}.wrap{max-width:1300px;margin:22px auto;padding:0 14px}
+.panel{background:white;border:1px solid var(--line);border-radius:12px;padding:18px;margin-bottom:16px;box-shadow:0 3px 12px #102a4308}
+.hidden{display:none!important}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px}
+label{display:block;font-size:13px;color:#475467;margin-bottom:5px}input,select,textarea{width:100%;padding:10px;border:1px solid #cfd7e3;border-radius:8px;background:#fff;color:#101828}textarea{min-height:78px;resize:vertical}
+.tabs{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px}.tabs button{background:#e5eaf2;color:#233754}.tabs button.active{background:var(--blue);color:#fff}
+table{width:100%;border-collapse:collapse;min-width:850px}th,td{padding:10px;border-bottom:1px solid var(--line);text-align:right;vertical-align:top;font-size:13px}th{background:#f8fafc}
+.table-wrap{overflow:auto}.toolbar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;justify-content:space-between;margin:12px 0}
+.toolbar input{max-width:350px}.status{padding:10px;border-radius:8px;background:#eef4ff;color:#173b77;margin:10px 0}.error{background:#fff0f0;color:#9b1c1c}.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px}.metric{padding:16px;border:1px solid var(--line);border-radius:10px}.metric strong{font-size:25px;display:block;margin-top:8px}
+.small{font-size:12px;color:#667085}.row-actions{display:flex;gap:6px;flex-wrap:wrap}.row-actions button{padding:6px 9px;font-size:12px}
+@media(max-width:600px){header h1{font-size:17px}.panel{padding:12px}.wrap{margin:12px auto}}
+</style>
+</head>
+<body>
+<header><h1>⚖️ نظام إدارة مكتب المحاماة</h1><div id="user-area" class="hidden"><span id="user-email"></span> <button id="logout" class="secondary">تسجيل الخروج</button></div></header>
+<div class="wrap">
+<section id="setup-panel" class="panel">
+<h2>إعداد الاتصال بقاعدة البيانات</h2>
+<p>أدخل بيانات مشروع Supabase. تُحفظ هذه الإعدادات في هذا المتصفح فقط. لا تضع مفتاح service_role هنا.</p>
+<div class="grid"><div><label>رابط مشروع Supabase</label><input id="sb-url" placeholder="https://xxxx.supabase.co"></div><div><label>المفتاح العام anon / publishable</label><input id="sb-key" placeholder="sb_publishable_... أو anon key"></div></div>
+<div class="toolbar"><button id="save-config">حفظ الإعدادات والاتصال</button><button id="clear-config" class="secondary">مسح الإعدادات المحفوظة</button></div>
+<div id="setup-status" class="status">يلزم إنشاء مشروع Supabase وتشغيل ملف schema.sql قبل تسجيل الدخول.</div>
+</section>
+<section id="auth-panel" class="panel hidden">
+<h2 id="auth-title">تسجيل الدخول</h2><p class="small">يُنشأ المستخدم الأول من لوحة Supabase Authentication، أو فعّل التسجيل وفق سياسة المكتب.</p>
+<div class="grid"><div><label>البريد الإلكتروني</label><input id="auth-email" type="email" autocomplete="username"></div><div><label>كلمة المرور</label><input id="auth-password" type="password" autocomplete="current-password"></div></div>
+<div class="toolbar"><div><button id="login-btn">تسجيل الدخول</button> <button id="signup-btn" class="secondary">إنشاء حساب</button></div></div><div id="auth-status" class="status"></div>
+</section>
+<section id="app" class="hidden">
+<div class="panel"><div class="cards"><div class="metric">القضايا<strong id="metric-cases">0</strong></div><div class="metric">الجلسات القادمة<strong id="metric-hearings">0</strong></div><div class="metric">الإعلانات<strong id="metric-notices">0</strong></div><div class="metric">المهام المفتوحة<strong id="metric-tasks">0</strong></div></div></div>
+<div class="panel">
+<div class="tabs" id="tabs"><button class="active" data-tab="cases">القضايا</button><button data-tab="clients">الموكلون</button><button data-tab="hearings">الجلسات</button><button data-tab="notices">الإعلانات والمحضرون</button><button data-tab="tasks">المهام</button><button data-tab="team">فريق المكتب</button></div>
+<div id="main-status" class="status">متصل.</div>
+<div id="section-cases" class="data-section">
+<h2>سجل القضايا</h2><form id="form-cases" data-table="cases"><input type="hidden" name="id"><div class="grid">
+<div><label>اسم/رقم القضية *</label><input name="case_number" required></div><div><label>المحكمة</label><input name="court"></div><div><label>نوع القضية</label><select name="case_type"><option>مدني</option><option>أسرة</option><option>تجاري</option><option>جنائي</option><option>إداري</option><option>عمالي</option><option>أخرى</option></select></div><div><label>الموكل</label><select name="client_id" class="client-options"><option value="">— غير محدد —</option></select></div><div><label>المدعي</label><input name="plaintiff"></div><div><label>المدعى عليه</label><input name="defendant"></div><div><label>الحالة</label><select name="status"><option>منظورة</option><option>مؤجلة</option><option>محجوزة للحكم</option><option>منتهية</option><option>موقوفة</option></select></div><div><label>تاريخ الجلسة القادمة</label><input type="date" name="next_session"></div><div><label>آخر قرار</label><textarea name="last_decision"></textarea></div><div><label>ملاحظات داخلية</label><textarea name="notes"></textarea></div></div><div class="toolbar"><button type="submit">حفظ القضية</button><button type="button" class="secondary reset-form">إلغاء</button></div></form>
+<div class="toolbar"><input class="search" data-target="cases-table" placeholder="بحث في القضايا..."><button class="secondary export-csv" data-table="cases">تصدير CSV</button></div><div class="table-wrap"><table id="cases-table"><thead><tr><th>القضية</th><th>المحكمة</th><th>النوع</th><th>الموكل</th><th>الأطراف</th><th>الحالة</th><th>الجلسة القادمة</th><th>إجراءات</th></tr></thead><tbody></tbody></table></div>
+</div>
+<div id="section-clients" class="data-section hidden"><h2>الموكلون</h2><form id="form-clients" data-table="clients"><input type="hidden" name="id"><div class="grid"><div><label>الاسم *</label><input name="name" required></div><div><label>الهاتف</label><input name="phone" type="tel"></div><div><label>البريد الإلكتروني</label><input name="email" type="email"></div><div><label>العنوان</label><input name="address"></div><div><label>ملاحظات</label><textarea name="notes"></textarea></div></div><div class="toolbar"><button type="submit">حفظ الموكل</button><button type="button" class="secondary reset-form">إلغاء</button></div></form><div class="toolbar"><input class="search" data-target="clients-table" placeholder="بحث في الموكلين..."></div><div class="table-wrap"><table id="clients-table"><thead><tr><th>الاسم</th><th>الهاتف</th><th>البريد</th><th>العنوان</th><th>إجراءات</th></tr></thead><tbody></tbody></table></div></div>
+<div id="section-hearings" class="data-section hidden"><h2>الجلسات والتنبيهات</h2><form id="form-hearings" data-table="hearings"><input type="hidden" name="id"><div class="grid"><div><label>القضية *</label><select name="case_id" class="case-options" required><option value="">اختر القضية</option></select></div><div><label>تاريخ الجلسة *</label><input type="date" name="hearing_date" required></div><div><label>الدائرة/القاعة</label><input name="courtroom"></div><div><label>القرار/الملاحظات</label><textarea name="decision"></textarea></div></div><div class="toolbar"><button type="submit">حفظ الجلسة</button><button type="button" class="secondary reset-form">إلغاء</button></div></form><div class="table-wrap"><table id="hearings-table"><thead><tr><th>القضية</th><th>التاريخ</th><th>الدائرة/القاعة</th><th>القرار</th><th>إجراءات</th></tr></thead><tbody></tbody></table></div></div>
+<div id="section-notices" class="data-section hidden"><h2>الإعلانات والمحضرون</h2><form id="form-notices" data-table="notices"><input type="hidden" name="id"><div class="grid"><div><label>القضية</label><select name="case_id" class="case-options"><option value="">— غير محدد —</option></select></div><div><label>اسم المعلن إليه *</label><input name="recipient" required></div><div><label>رقم قيد المحضرين</label><input name="bailiff_number"></div><div><label>قلم المحضرين</label><input name="bailiff_office"></div><div><label>تاريخ التسليم</label><input type="date" name="delivery_date"></div><div><label>حالة الإعلان</label><select name="status"><option>قيد الإعلان</option><option>تم الإعلان</option><option>لم يتم الإعلان</option><option>إعادة إعلان</option></select></div><div><label>النتيجة والملاحظات</label><textarea name="notes"></textarea></div></div><div class="toolbar"><button type="submit">حفظ الإعلان</button><button type="button" class="secondary reset-form">إلغاء</button></div></form><div class="table-wrap"><table id="notices-table"><thead><tr><th>القضية</th><th>المعلن إليه</th><th>رقم القيد</th><th>القلم</th><th>تاريخ التسليم</th><th>الحالة</th><th>ملاحظات</th><th>إجراءات</th></tr></thead><tbody></tbody></table></div></div>
+<div id="section-tasks" class="data-section hidden"><h2>المهام والمتابعات</h2><form id="form-tasks" data-table="tasks"><input type="hidden" name="id"><div class="grid"><div><label>عنوان المهمة *</label><input name="title" required></div><div><label>القضية</label><select name="case_id" class="case-options"><option value="">— غير محدد —</option></select></div><div><label>المسؤول</label><input name="assigned_to" placeholder="اسم المسؤول أو بريده"></div><div><label>موعد الاستحقاق</label><input type="date" name="due_date"></div><div><label>الحالة</label><select name="status"><option>مفتوحة</option><option>قيد التنفيذ</option><option>منجزة</option><option>ملغاة</option></select></div><div><label>تفاصيل</label><textarea name="details"></textarea></div></div><div class="toolbar"><button type="submit">حفظ المهمة</button><button type="button" class="secondary reset-form">إلغاء</button></div></form><div class="table-wrap"><table id="tasks-table"><thead><tr><th>المهمة</th><th>القضية</th><th>المسؤول</th><th>الموعد</th><th>الحالة</th><th>التفاصيل</th><th>إجراءات</th></tr></thead><tbody></tbody></table></div></div>
+<div id="section-team" class="data-section hidden"><h2>فريق المكتب</h2><p>تُدار الحسابات والأدوار من لوحة Supabase. لا تمنح صلاحية الإدارة إلا للأشخاص الموثوقين.</p><div class="status">هذا الإصدار لا يسمح للمستخدم بترقية صلاحياته بنفسه. أضف أعضاء الفريق من لوحة Supabase Auth ثم امنحهم الدور المناسب في جدول profiles وفق تعليمات README.</div><div class="table-wrap"><table id="team-table"><thead><tr><th>البريد</th><th>الدور</th><th>تاريخ الإنشاء</th></tr></thead><tbody></tbody></table></div></div>
+</div>
+</section>
+<footer class="small">نسخة أولية قابلة للتطوير. لا تُدخل بيانات سرية قبل إعداد سياسات الوصول والنسخ الاحتياطي واختبار الصلاحيات.</footer>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+(() => {
+'use strict';
+const $ = s => document.querySelector(s);
+const $$ = s => [...document.querySelectorAll(s)];
+const configKey = 'lawOfficeSupabaseConfig';
+let sb = null, currentUser = null;
+const tables = ['cases','clients','hearings','notices','tasks'];
+const cache = {cases:[],clients:[],hearings:[],notices:[],tasks:[],profiles:[]};
+const fields = {
+ cases:['case_number','court','case_type','client_id','plaintiff','defendant','status','next_session','last_decision','notes'],
+ clients:['name','phone','email','address','notes'],
+ hearings:['case_id','hearing_date','courtroom','decision'],
+ notices:['case_id','recipient','bailiff_number','bailiff_office','delivery_date','status','notes'],
+ tasks:['title','case_id','assigned_to','due_date','status','details']
+};
+function message(el, msg, error=false){el.textContent=msg;el.classList.toggle('error',error);}
+function getConfig(){try{return JSON.parse(localStorage.getItem(configKey)||'{}')}catch{return {}}}
+function setSetupStatus(msg,error=false){message($('#setup-status'),msg,error)}
+function setAuthStatus(msg,error=false){message($('#auth-status'),msg,error)}
+function setMainStatus(msg,error=false){message($('#main-status'),msg,error)}
+function escapeHtml(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+function val(form,name){return form.elements[name]?.value?.trim() ?? '';}
+function rowById(table,id){return cache[table].find(x=>x.id===id);}
+function caseLabel(id){const c=rowById('cases',id);return c ? `${c.case_number}${c.court?' — '+c.court:''}` : '—';}
+function clientLabel(id){const c=rowById('clients',id);return c?.name||'—';}
+function refreshOptions(){
+ $$('.client-options').forEach(s=>{const old=s.value;s.innerHTML='<option value="">— غير محدد —</option>'+cache.clients.map(c=>`<option value="${c.id}">${escapeHtml(c.name)}</option>`).join('');s.value=old;});
+ $$('.case-options').forEach(s=>{const old=s.value;const empty=s.querySelector('option[value=""]')?.textContent||'اختر القضية';s.innerHTML=`<option value="">${escapeHtml(empty)}</option>`+cache.cases.map(c=>`<option value="${c.id}">${escapeHtml(caseLabel(c.id))}</option>`).join('');s.value=old;});
+}
+function actionButtons(table,id){return `<div class="row-actions"><button class="secondary" data-edit="${table}" data-id="${id}">تعديل</button><button class="danger" data-delete="${table}" data-id="${id}">حذف</button></div>`;}
+function renderTable(table, rows, columns){
+ const body=$(`#${table}-table tbody`); if(!body)return;
+ body.innerHTML=rows.map(r=>`<tr>${columns.map(col=>`<td>${escapeHtml(col(r))}</td>`).join('')}<td>${actionButtons(table,r.id)}</td></tr>`).join('');
+}
+function render(){
+ refreshOptions();
+ renderTable('cases',cache.cases,c=>[c.case_number,c.court,c.case_type,clientLabel(c.client_id),`${c.plaintiff||''}${c.defendant?' / '+c.defendant:''}`,c.status,c.next_session]);
+ renderTable('clients',cache.clients,c=>[c.name,c.phone,c.email,c.address]);
+ renderTable('hearings',cache.hearings,c=>[caseLabel(c.case_id),c.hearing_date,c.courtroom,c.decision]);
+ renderTable('notices',cache.notices,c=>[caseLabel(c.case_id),c.recipient,c.bailiff_number,c.bailiff_office,c.delivery_date,c.status,c.notes]);
+ renderTable('tasks',cache.tasks,c=>[c.title,caseLabel(c.case_id),c.assigned_to,c.due_date,c.status,c.details]);
+ $('#metric-cases').textContent=cache.cases.length;
+ $('#metric-hearings').textContent=cache.hearings.filter(h=>h.hearing_date>=new Date().toISOString().slice(0,10)).length;
+ $('#metric-notices').textContent=cache.notices.length;
+ $('#metric-tasks').textContent=cache.tasks.filter(t=>t.status!=='منجزة'&&t.status!=='ملغاة').length;
+ const team=$('#team-table tbody');team.innerHTML=cache.profiles.map(p=>`<tr><td>${escapeHtml(p.email||p.id)}</td><td>${escapeHtml(p.role)}</td><td>${escapeHtml((p.created_at||'').slice(0,10))}</td></tr>`).join('');
+}
+async function loadAll(){
+ setMainStatus('جارٍ تحميل بيانات المكتب...');
+ try{
+  for(const table of tables){
+   const {data,error}=await sb.from(table).select('*').order('created_at',{ascending:false});
+   if(error)throw error;cache[table]=data||[];
+  }
+  const {data:profiles,error}=await sb.from('profiles').select('id,email,role,created_at').order('created_at');
+  if(error)throw error;cache.profiles=profiles||[];
+  render();setMainStatus('تمت مزامنة البيانات مع قاعدة البيانات.');
+ }catch(e){setMainStatus('تعذر تحميل البيانات: '+(e.message||e),true);}
+}
+function showApp(user){
+ currentUser=user;$('#auth-panel').classList.add('hidden');$('#app').classList.remove('hidden');$('#user-area').classList.remove('hidden');$('#user-email').textContent=user.email||user.id;loadAll();
+}
+function showLoggedOut(){
+ currentUser=null;$('#app').classList.add('hidden');$('#user-area').classList.add('hidden');$('#auth-panel').classList.remove('hidden');
+}
+function connect(){
+ if(!window.supabase){setSetupStatus('تعذر تحميل مكتبة Supabase. تحقق من اتصال الإنترنت.',true);return;}
+ const cfg=getConfig();const url=$('#sb-url').value.trim();const key=$('#sb-key').value.trim();
+ if(!url||!key){setSetupStatus('أدخل رابط المشروع والمفتاح العام.',true);return;}
+ if(!/^https:\/\/[a-zA-Z0-9.-]+$/.test(url)){setSetupStatus('رابط المشروع غير صحيح.',true);return;}
+ localStorage.setItem(configKey,JSON.stringify({url,key}));
+ sb=window.supabase.createClient(url,key);
+ setSetupStatus('تم حفظ الإعدادات. تحقق من اتصال قاعدة البيانات ثم سجّل الدخول.');
+ $('#auth-panel').classList.remove('hidden');
+ sb.auth.getSession().then(({data,error})=>{if(error){setAuthStatus(error.message,true);return;}if(data.session)showApp(data.session.user);});
+ sb.auth.onAuthStateChange((event,session)=>{if(session?.user)showApp(session.user);else if(event==='SIGNED_OUT')showLoggedOut();});
+}
+$('#save-config').addEventListener('click',connect);
+$('#clear-config').addEventListener('click',()=>{localStorage.removeItem(configKey);$('#sb-url').value='';$('#sb-key').value='';sb=null;setSetupStatus('تم مسح الإعدادات من هذا المتصفح.');});
+const saved=getConfig();$('#sb-url').value=saved.url||'';$('#sb-key').value=saved.key||'';
+$('#login-btn').addEventListener('click',async()=>{if(!sb){setAuthStatus('احفظ إعدادات Supabase أولاً.',true);return;}const email=$('#auth-email').value.trim(),password=$('#auth-password').value;if(!email||!password){setAuthStatus('أدخل البريد الإلكتروني وكلمة المرور.',true);return;}const {error}=await sb.auth.signInWithPassword({email,password});if(error)setAuthStatus(error.message,true);});
+$('#signup-btn').addEventListener('click',async()=>{if(!sb){setAuthStatus('احفظ إعدادات Supabase أولاً.',true);return;}const email=$('#auth-email').value.trim(),password=$('#auth-password').value;if(!email||password.length<8){setAuthStatus('أدخل بريدًا صحيحًا وكلمة مرور من 8 أحرف على الأقل.',true);return;}const {error}=await sb.auth.signUp({email,password});setAuthStatus(error?error.message:'تم إرسال طلب التسجيل. قد تحتاج إلى تأكيد البريد الإلكتروني.');});
+$('#logout').addEventListener('click',async()=>{if(sb)await sb.auth.signOut();});
+$('#tabs').addEventListener('click',e=>{const b=e.target.closest('[data-tab]');if(!b)return;$$('#tabs button').forEach(x=>x.classList.toggle('active',x===b));$$('.data-section').forEach(x=>x.classList.add('hidden'));$('#section-'+b.dataset.tab).classList.remove('hidden');});
+$$('form[data-table]').forEach(form=>form.addEventListener('submit',async e=>{
+ e.preventDefault();if(!sb||!currentUser)return;
+ const table=form.dataset.table;const id=val(form,'id');const payload={};
+ fields[table].forEach(k=>{let v=val(form,k);payload[k]=v===''?null:v;});
+ try{
+  let result=id?await sb.from(table).update(payload).eq('id',id).select().single():await sb.from(table).insert(payload).select().single();
+  if(result.error)throw result.error;
+  form.reset();form.elements.id.value='';await loadAll();setMainStatus('تم حفظ السجل بنجاح.');
+ }catch(err){setMainStatus('لم يتم الحفظ: '+(err.message||err),true);}
+}));
+$$('.reset-form').forEach(b=>b.addEventListener('click',()=>{const f=b.closest('form');f.reset();f.elements.id.value='';}));
+document.addEventListener('click',async e=>{
+ const edit=e.target.closest('[data-edit]');const del=e.target.closest('[data-delete]');
+ if(edit){const t=edit.dataset.edit,r=rowById(t,edit.dataset.id),f=$(`#form-${t}`);if(!r||!f)return;Object.keys(r).forEach(k=>{if(f.elements[k])f.elements[k].value=r[k]??'';});$$('.data-section').forEach(s=>s.classList.add('hidden'));$('#section-'+t).classList.remove('hidden');$$('#tabs button').forEach(b=>b.classList.toggle('active',b.dataset.tab===t));f.scrollIntoView({behavior:'smooth',block:'start'});}
+ if(del){const t=del.dataset.delete,id=del.dataset.id;if(!confirm('هل تريد حذف هذا السجل نهائيًا؟'))return;try{const {error}=await sb.from(t).delete().eq('id',id);if(error)throw error;await loadAll();}catch(err){setMainStatus('تعذر الحذف: '+err.message,true);}}
+});
+$$('.search').forEach(inp=>inp.addEventListener('input',()=>{const table=$('#'+inp.dataset.target);const q=inp.value.toLocaleLowerCase('ar');table.querySelectorAll('tbody tr').forEach(tr=>tr.style.display=tr.innerText.toLocaleLowerCase('ar').includes(q)?'':'none');}));
+$$('.export-csv').forEach(b=>b.addEventListener('click',()=>{const t=b.dataset.table;const rows=cache[t];if(!rows.length){setMainStatus('لا توجد بيانات لتصديرها.');return;}const keys=fields[t];const csv=[keys.join(','),...rows.map(r=>keys.map(k=>'"'+String(r[k]??'').replace(/"/g,'""')+'"').join(','))].join('\r\n');const blob=new Blob(['\ufeff'+csv],{type:'text/csv;charset=utf-8;'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=t+'-backup.csv';a.click();URL.revokeObjectURL(a.href);}));
+})();
+</script>
+</body></html>
