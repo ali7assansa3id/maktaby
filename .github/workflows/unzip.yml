@@ -1,0 +1,22 @@
+name: Auto Unzip Law Office System
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  unzip:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Extract ZIP file
+        run: |
+          unzip law-office-system.zip -d extracted_files/
+
+      - name: Commit unzipped files
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: "فك ضغط ملف law-office-system.zip تلقائياً"
+          branch: main
