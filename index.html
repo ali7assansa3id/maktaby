@@ -24,12 +24,10 @@ table{width:100%;border-collapse:collapse;min-width:850px}th,td{padding:10px;bor
 <body>
 <header><h1>⚖️ نظام إدارة مكتب المحاماة</h1><div id="user-area" class="hidden"><span id="user-email"></span> <button id="logout" class="secondary">تسجيل الخروج</button></div></header>
 <div class="wrap">
-<section id="setup-panel" class="panel">
-<h2>إعداد الاتصال بقاعدة البيانات</h2>
-<p>أدخل بيانات مشروع Supabase. تُحفظ هذه الإعدادات في هذا المتصفح فقط. لا تضع مفتاح service_role هنا.</p>
-<div class="grid"><div><label>رابط مشروع Supabase</label><input id="sb-url" placeholder="https://xxxx.supabase.co"></div><div><label>المفتاح العام anon / publishable</label><input id="sb-key" placeholder="sb_publishable_... أو anon key"></div></div>
-<div class="toolbar"><button id="save-config">حفظ الإعدادات والاتصال</button><button id="clear-config" class="secondary">مسح الإعدادات المحفوظة</button></div>
-<div id="setup-status" class="status">يلزم إنشاء مشروع Supabase وتشغيل ملف schema.sql قبل تسجيل الدخول.</div>
+<section id="connection-status-panel" class="panel">
+<h2>نظام إدارة مكتب المحاماة</h2>
+<div id="connection-status" class="status">جارٍ الاتصال بخدمة النظام...</div>
+<p class="small">لا يلزم إدخال رابط قاعدة البيانات أو المفتاح يدويًا. سجّل الدخول بحساب المكتب.</p>
 </section>
 <section id="auth-panel" class="panel hidden">
 <h2 id="auth-title">تسجيل الدخول</h2><p class="small">يُنشأ المستخدم الأول من لوحة Supabase Authentication، أو فعّل التسجيل وفق سياسة المكتب.</p>
@@ -61,7 +59,8 @@ table{width:100%;border-collapse:collapse;min-width:850px}th,td{padding:10px;bor
 'use strict';
 const $ = s => document.querySelector(s);
 const $$ = s => [...document.querySelectorAll(s)];
-const configKey = 'lawOfficeSupabaseConfig';
+const SUPABASE_URL = 'https://hlodfyeumitngkmiytfq.supabase.co';
+const SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_rViT0eEB-AUu_bZO3alSWQ_awVlWIFL';
 let sb = null, currentUser = null;
 const tables = ['cases','clients','hearings','notices','tasks'];
 const cache = {cases:[],clients:[],hearings:[],notices:[],tasks:[],profiles:[]};
@@ -73,8 +72,6 @@ const fields = {
  tasks:['title','case_id','assigned_to','due_date','status','details']
 };
 function message(el, msg, error=false){el.textContent=msg;el.classList.toggle('error',error);}
-function getConfig(){try{return JSON.parse(localStorage.getItem(configKey)||'{}')}catch{return {}}}
-function setSetupStatus(msg,error=false){message($('#setup-status'),msg,error)}
 function setAuthStatus(msg,error=false){message($('#auth-status'),msg,error)}
 function setMainStatus(msg,error=false){message($('#main-status'),msg,error)}
 function escapeHtml(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
@@ -123,22 +120,19 @@ function showLoggedOut(){
  currentUser=null;$('#app').classList.add('hidden');$('#user-area').classList.add('hidden');$('#auth-panel').classList.remove('hidden');
 }
 function connect(){
- if(!window.supabase){setSetupStatus('تعذر تحميل مكتبة Supabase. تحقق من اتصال الإنترنت.',true);return;}
- const cfg=getConfig();const url=$('#sb-url').value.trim();const key=$('#sb-key').value.trim();
- if(!url||!key){setSetupStatus('أدخل رابط المشروع والمفتاح العام.',true);return;}
- if(!/^https:\/\/[a-zA-Z0-9.-]+$/.test(url)){setSetupStatus('رابط المشروع غير صحيح.',true);return;}
- localStorage.setItem(configKey,JSON.stringify({url,key}));
- sb=window.supabase.createClient(url,key);
- setSetupStatus('تم حفظ الإعدادات. تحقق من اتصال قاعدة البيانات ثم سجّل الدخول.');
- $('#auth-panel').classList.remove('hidden');
- sb.auth.getSession().then(({data,error})=>{if(error){setAuthStatus(error.message,true);return;}if(data.session)showApp(data.session.user);});
- sb.auth.onAuthStateChange((event,session)=>{if(session?.user)showApp(session.user);else if(event==='SIGNED_OUT')showLoggedOut();});
+ if(!window.supabase){setConnectionStatus('تعذر تحميل مكتبة الاتصال. تحقق من الإنترنت ثم حدّث الصفحة.',true);return;}
+ if(!SUPABASE_URL || !SUPABASE_PUBLISHABLE_KEY){setConnectionStatus('إعداد الاتصال غير مكتمل. راجع إعدادات نشر الموقع.',true);return;}
+ try{
+  sb=window.supabase.createClient(SUPABASE_URL,SUPABASE_PUBLISHABLE_KEY);
+  setConnectionStatus('تم إعداد الاتصال. سجّل الدخول للمتابعة.');
+  $('#auth-panel').classList.remove('hidden');
+  sb.auth.onAuthStateChange((event,session)=>{if(session?.user)showApp(session.user);else if(event==='SIGNED_OUT')showLoggedOut();});
+  sb.auth.getSession().then(({data,error})=>{if(error){setAuthStatus(error.message,true);return;}if(data.session)showApp(data.session.user);});
+ }catch(e){setConnectionStatus('تعذر بدء الاتصال: '+(e.message||e),true);}
 }
-$('#save-config').addEventListener('click',connect);
-$('#clear-config').addEventListener('click',()=>{localStorage.removeItem(configKey);$('#sb-url').value='';$('#sb-key').value='';sb=null;setSetupStatus('تم مسح الإعدادات من هذا المتصفح.');});
-const saved=getConfig();$('#sb-url').value=saved.url||'';$('#sb-key').value=saved.key||'';
-$('#login-btn').addEventListener('click',async()=>{if(!sb){setAuthStatus('احفظ إعدادات Supabase أولاً.',true);return;}const email=$('#auth-email').value.trim(),password=$('#auth-password').value;if(!email||!password){setAuthStatus('أدخل البريد الإلكتروني وكلمة المرور.',true);return;}const {error}=await sb.auth.signInWithPassword({email,password});if(error)setAuthStatus(error.message,true);});
-$('#signup-btn').addEventListener('click',async()=>{if(!sb){setAuthStatus('احفظ إعدادات Supabase أولاً.',true);return;}const email=$('#auth-email').value.trim(),password=$('#auth-password').value;if(!email||password.length<8){setAuthStatus('أدخل بريدًا صحيحًا وكلمة مرور من 8 أحرف على الأقل.',true);return;}const {error}=await sb.auth.signUp({email,password});setAuthStatus(error?error.message:'تم إرسال طلب التسجيل. قد تحتاج إلى تأكيد البريد الإلكتروني.');});
+connect();
+$('#login-btn').addEventListener('click',async()=>{if(!sb){setAuthStatus('الاتصال غير جاهز. حدّث الصفحة وحاول مجددًا.',true);return;}const email=$('#auth-email').value.trim(),password=$('#auth-password').value;if(!email||!password){setAuthStatus('أدخل البريد الإلكتروني وكلمة المرور.',true);return;}const {error}=await sb.auth.signInWithPassword({email,password});if(error)setAuthStatus(error.message,true);});
+$('#signup-btn').addEventListener('click',async()=>{if(!sb){setAuthStatus('الاتصال غير جاهز. حدّث الصفحة وحاول مجددًا.',true);return;}const email=$('#auth-email').value.trim(),password=$('#auth-password').value;if(!email||password.length<8){setAuthStatus('أدخل بريدًا صحيحًا وكلمة مرور من 8 أحرف على الأقل.',true);return;}const {error}=await sb.auth.signUp({email,password});setAuthStatus(error?error.message:'تم إرسال طلب التسجيل. قد تحتاج إلى تأكيد البريد الإلكتروني.');});
 $('#logout').addEventListener('click',async()=>{if(sb)await sb.auth.signOut();});
 $('#tabs').addEventListener('click',e=>{const b=e.target.closest('[data-tab]');if(!b)return;$$('#tabs button').forEach(x=>x.classList.toggle('active',x===b));$$('.data-section').forEach(x=>x.classList.add('hidden'));$('#section-'+b.dataset.tab).classList.remove('hidden');});
 $$('form[data-table]').forEach(form=>form.addEventListener('submit',async e=>{
