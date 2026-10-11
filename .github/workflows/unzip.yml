@@ -7,23 +7,18 @@ on:
 jobs:
   unzip:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
       - name: Extract ZIP file
         run: |
-          # فك ضغط الملف مباشرة في مجلد المشروع الرئيسي
           unzip -o law-office-system.zip
           
-      - name: Configure Git User
-        run: |
-          git config --global user.name "GitHub Actions Bot"
-          git config --global user.email "actions@github.com"
-
-      - name: Add and Commit extracted files
-        run: |
-          git add -A
-          # إذا لم تكن هناك تغييرات جديدة، لا تفعل شيئاً لتجنب حدوث خطأ
-          git diff --staged --quiet || git commit -m "فك ضغط law-office-system.zip تلقائياً"
-          git push
+      - name: Commit changes
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: "فك ضغط ملف law-office-system.zip تلقائياً"
+          branch: main
