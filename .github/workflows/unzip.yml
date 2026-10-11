@@ -1,0 +1,33 @@
+name: Unzip and Move to Main
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  unzip:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Extract ZIP file
+        run: |
+          # فك ضغط الملف
+          unzip -o law-office-system.zip -d temp_extracted
+          
+          # نقل كل محتويات المجلد الناتج مباشرة إلى المجلد الرئيسي للمشروع
+          # (استبدل law-office-system بالاسم الحقيقي للمجلد الذي يظهر داخل الـ ZIP إذا كان مختلفاً)
+          shopt -s dotglob
+          mv temp_extracted/law-office-system/* ./
+          
+          # حذف المجلد المؤقت والفارغ الآن
+          rm -rf temp_extracted
+          
+      - name: Commit changes
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: "نقل محتويات ملف الـ ZIP مباشرة إلى الرئيسية main"
+          branch: main
